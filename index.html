@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bangkok Urban Well-being | ระบบสารสนเทศภูมิศาสตร์เว็บ</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!-- Leaflet MarkerCluster -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-dark:       #0d1117;
+    --bg-panel:      #161b22;
+    --bg-card:       #21262d;
+    --border:        #30363d;
+    --text-primary:  #e6edf3;
+    --text-secondary:#8b949e;
+    --text-muted:    #484f58;
+    --accent-green:  #39d353;
+    --accent-blue:   #58a6ff;
+    --accent-purple: #bc8cff;
+    --accent-yellow: #f0c040;
+    --accent-orange: #ff7b2e;
+    --accent-red:    #ff4b4b;
+
+    /* Transit colors */
+    --bts-sukhumvit: #5dbd6a;
+    --bts-silom:     #1a6b35;
+    --bts-gold:      #d4a800;
+    --mrt-blue:      #1e60d5;
+    --mrt-purple:    #6e3bb5;
+    --mrt-yellow:    #e5c000;
+
+    /* LU colors */
+    --lu-urban:      #e06060;
+    --lu-agri:       #7ec850;
+    --lu-water:      #4fa8e8;
+    --lu-misc:       #aaa;
+    --lu-forest:     #2d7a3a;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; font-family:'Sarabun',sans-serif; background:var(--bg-dark); color:var(--text-primary); }
+
+  /* ── HEADER ── */
+  #header {
+    position:fixed; top:0; left:0; right:0; height:56px;
+    background:rgba(13,17,23,0.96); border-bottom:1px solid var(--border);
+    backdrop-filter:blur(12px); z-index:1100;
+    display:flex; align-items:center; padding:0 18px; gap:14px;
+  }
+  #header .logo {
+    display:flex; align-items:center; gap:9px;
+    font-family:'IBM Plex Sans Thai',sans-serif; font-weight:600; font-size:15px;
+    color:var(--text-primary); white-space:nowrap;
+  }
+  #header .logo-dot {
+    width:10px; height:10px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent-green),var(--accent-blue));
+    box-shadow:0 0 8px var(--accent-green);
+    animation:pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  #header .tagline {
+    font-size:12px; color:var(--text-muted); margin-left:2px;
+    font-family:'Sarabun',sans-serif; font-weight:300;
+  }
+  #header .header-badges {
+    display:flex; gap:6px; margin-left:auto; flex-wrap:wrap;
+  }
+  .badge {
+    padding:3px 9px; border-radius:12px; font-size:11px; font-weight:500;
+    border:1px solid; letter-spacing:.3px;
+  }
+  .badge-transport { background:rgba(88,166,255,.12); border-color:rgba(88,166,255,.4); color:var(--accent-blue); }
+  .badge-urban     { background:rgba(224,96,96,.12); border-color:rgba(224,96,96,.4); color:var(--accent-red); }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    position:fixed; top:56px; left:0; bottom:0; width:300px;
+    background:var(--bg-panel); border-right:1px solid var(--border);
+    overflow-y:auto; z-index:1000; display:flex; flex-direction:column;
+  }
+  #sidebar::-webkit-scrollbar { width:4px; }
+  #sidebar::-webkit-scrollbar-track { background:transparent; }
+  #sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .sidebar-section {
+    border-bottom:1px solid var(--border); padding:14px 16px;
+  }
+  .sidebar-section:last-child { border-bottom:none; }
+  .section-title {
+    font-size:10px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--text-muted); margin-bottom:10px;
+  }
+
+  /* Layer toggles */
+  .layer-item {
+    display:flex; align-items:center; gap:9px; padding:5px 0;
+    cursor:pointer; border-radius:6px; transition:background .15s;
+    user-select:none;
+  }
+  .layer-item:hover { background:var(--bg-card); padding-left:6px; }
+  .layer-toggle {
+    position:relative; width:32px; height:18px; flex-shrink:0;
+    appearance:none; background:var(--border); border-radius:9px;
+    cursor:pointer; transition:background .2s;
+  }
+  .layer-toggle::after {
+    content:''; position:absolute; top:3px; left:3px;
+    width:12px; height:12px; border-radius:6px; background:var(--text-secondary);
+    transition:transform .2s, background .2s;
+  }
+  .layer-toggle:checked { background:var(--accent-blue); }
+  .layer-toggle:checked::after { transform:translateX(14px); background:#fff; }
+  .layer-label { font-size:13px; flex:1; }
+  .layer-dot {
+    width:10px; height:10px; border-radius:50%; flex-shrink:0;
+    border:2px solid rgba(255,255,255,.25);
+  }
+
+  /* Search */
+  #search-box {
+    width:100%; padding:8px 10px; border-radius:8px;
+    background:var(--bg-card); border:1px solid var(--border);
+    color:var(--text-primary); font-family:'Sarabun',sans-serif; font-size:13px;
+    outline:none; transition:border-color .2s;
+  }
+  #search-box:focus { border-color:var(--accent-blue); }
+  #search-results {
+    margin-top:6px; max-height:200px; overflow-y:auto;
+    border-radius:6px; overflow:hidden;
+  }
+  .search-result-item {
+    padding:7px 10px; cursor:pointer; font-size:12px;
+    background:var(--bg-card); border-bottom:1px solid var(--border);
+    transition:background .15s;
+  }
+  .search-result-item:hover { background:rgba(88,166,255,.15); }
+  .search-result-item .sr-name { font-weight:500; }
+  .search-result-item .sr-meta { color:var(--text-muted); font-size:11px; margin-top:1px; }
+
+  /* Filter */
+  .filter-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .chip {
+    padding:4px 10px; border-radius:14px; font-size:11px; cursor:pointer;
+    background:var(--bg-card); border:1px solid var(--border); color:var(--text-secondary);
+    transition:all .15s; user-select:none;
+  }
+  .chip:hover { border-color:var(--accent-blue); color:var(--text-primary); }
+  .chip.active { background:rgba(88,166,255,.18); border-color:var(--accent-blue); color:var(--accent-blue); }
+
+  /* Stats */
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .stat-card {
+    background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+    padding:10px; text-align:center;
+  }
+  .stat-number { font-size:22px; font-weight:600; color:var(--accent-blue); }
+  .stat-label { font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+  /* Legend */
+  .legend-item {
+    display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px;
+  }
+  .legend-swatch {
+    width:18px; height:10px; border-radius:2px; flex-shrink:0;
+    border:1px solid rgba(255,255,255,.15);
+  }
+  .legend-line {
+    width:20px; height:4px; border-radius:2px; flex-shrink:0;
+  }
+  .legend-circle {
+    width:12px; height:12px; border-radius:50%; flex-shrink:0;
+    border:2px solid rgba(255,255,255,.3);
+  }
+
+  /* MAP */
+  #map {
+    position:fixed; top:56px; left:300px; right:0; bottom:0;
+    background:#111;
+  }
+
+  /* POPUP */
+  .leaflet-popup-content-wrapper {
+    background:var(--bg-panel) !important;
+    border:1px solid var(--border) !important;
+    border-radius:10px !important;
+    box-shadow:0 8px 32px rgba(0,0,0,.6) !important;
+    color:var(--text-primary) !important;
+    padding:0 !important;
+  }
+  .leaflet-popup-tip { background:var(--bg-panel) !important; }
+  .leaflet-popup-content { margin:0 !important; width:240px !important; }
+  .popup-inner { padding:14px; }
+  .popup-type {
+    font-size:9px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--text-muted); font-weight:600; margin-bottom:4px;
+  }
+  .popup-name { font-size:15px; font-weight:600; margin-bottom:6px; line-height:1.3; }
+  .popup-row { display:flex; gap:6px; font-size:12px; color:var(--text-secondary); margin-top:3px; }
+  .popup-row strong { color:var(--text-primary); min-width:60px; }
+  .popup-tag {
+    display:inline-block; margin-top:8px; padding:3px 8px;
+    border-radius:10px; font-size:11px;
+  }
+  .popup-close-btn {
+    display:block; margin-top:10px; width:100%; padding:6px;
+    background:var(--bg-card); border:1px solid var(--border); border-radius:6px;
+    color:var(--text-secondary); font-size:12px; cursor:pointer; text-align:center;
+    font-family:'Sarabun',sans-serif; transition:background .15s;
+  }
+  .popup-close-btn:hover { background:rgba(88,166,255,.15); color:var(--accent-blue); }
+
+  /* Sidebar toggle button (mobile) */
+  #toggle-sidebar-btn {
+    display:none; position:fixed; top:66px; left:8px; z-index:1200;
+    width:34px; height:34px; border-radius:8px;
+    background:var(--bg-panel); border:1px solid var(--border);
+    color:var(--text-primary); cursor:pointer; font-size:16px;
+    align-items:center; justify-content:center;
+  }
+
+  /* Info Panel overlay */
+  #info-panel {
+    position:fixed; bottom:20px; left:316px;
+    background:var(--bg-panel); border:1px solid var(--border);
+    border-radius:10px; padding:12px 16px; z-index:900;
+    font-size:12px; color:var(--text-secondary); min-width:200px;
+    pointer-events:none;
+  }
+  #info-panel .info-title { font-weight:600; color:var(--text-primary); margin-bottom:4px; }
+
+  /* Zoom controls override */
+  .leaflet-control-zoom { border:1px solid var(--border) !important; border-radius:8px !important; overflow:hidden; }
+  .leaflet-control-zoom a {
+    background:var(--bg-panel) !important; color:var(--text-primary) !important;
+    border-bottom:1px solid var(--border) !important;
+  }
+  .leaflet-control-zoom a:hover { background:var(--bg-card) !important; }
+
+  /* Scale */
+  .leaflet-control-scale-line {
+    background:rgba(13,17,23,.7) !important;
+    border:1px solid var(--border) !important;
+    color:var(--text-secondary) !important; font-size:10px !important;
+  }
+
+  /* responsive */
+  @media(max-width:768px){
+    #sidebar { transform:translateX(-300px); transition:transform .3s; }
+    #sidebar.open { transform:translateX(0); }
+    #map { left:0; }
+    #toggle-sidebar-btn { display:flex; }
+    #info-panel { left:16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <span>Bangkok Urban Well-being</span>
+    <span class="tagline">WebGIS | ระบบสารสนเทศภูมิศาสตร์</span>
+  </div>
+  <div class="header-badges">
+    <span class="badge badge-transport">🚇 Transportation</span>
+    <span class="badge badge-urban">🏙 Land Use</span>
+  </div>
+</header>
+
+<!-- SIDEBAR TOGGLE (mobile) -->
+<button id="toggle-sidebar-btn" onclick="toggleSidebar()">☰</button>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+
+  <!-- STATS -->
+  <div class="sidebar-section">
+    <div class="section-title">📊 ภาพรวมระบบขนส่ง</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="stat-bts">63</div>
+        <div class="stat-label">สถานี BTS</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-mrt">76</div>
+        <div class="stat-label">สถานี MRT</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" style="color:var(--accent-green)">6</div>
+        <div class="stat-label">สายรถไฟฟ้า</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" style="color:var(--accent-purple)">50</div>
+        <div class="stat-label">เขต กทม.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="sidebar-section">
+    <div class="section-title">🔍 ค้นหาสถานี</div>
+    <input id="search-box" type="text" placeholder="พิมพ์ชื่อสถานี..." oninput="onSearch(this.value)">
+    <div id="search-results"></div>
+  </div>
+
+  <!-- FILTER BY LINE -->
+  <div class="sidebar-section">
+    <div class="section-title">🚉 กรองตามสาย</div>
+    <div class="filter-chips">
+      <div class="chip active" data-line="all" onclick="filterLine(this,'all')">ทั้งหมด</div>
+      <div class="chip" data-line="bts-sukhumvit" onclick="filterLine(this,'bts-sukhumvit')" style="--c:var(--bts-sukhumvit)">สายสุขุมวิท</div>
+      <div class="chip" data-line="bts-silom" onclick="filterLine(this,'bts-silom')">สายสีลม</div>
+      <div class="chip" data-line="bts-gold" onclick="filterLine(this,'bts-gold')">สายสีทอง</div>
+      <div class="chip" data-line="mrt-blue" onclick="filterLine(this,'mrt-blue')">MRT สีน้ำเงิน</div>
+      <div class="chip" data-line="mrt-purple" onclick="filterLine(this,'mrt-purple')">MRT สีม่วง</div>
+      <div class="chip" data-line="mrt-yellow" onclick="filterLine(this,'mrt-yellow')">MRT สีเหลือง</div>
+    </div>
+  </div>
+
+  <!-- LAYER CONTROL -->
+  <div class="sidebar-section">
+    <div class="section-title">🗂 ชั้นข้อมูล</div>
+    <div class="layer-item">
+      <input type="checkbox" class="layer-toggle" id="lay-bts" checked onchange="toggleLayer('bts',this.checked)">
+      <div class="layer-dot" style="background:var(--bts-sukhumvit)"></div>
+      <label class="layer-label" for="lay-bts">สถานี BTS (63 สถานี)</label>
+    </div>
+    <div class="layer-item">
+      <input type="checkbox" class="layer-toggle" id="lay-mrt" checked onchange="toggleLayer('mrt',this.checked)">
+      <div class="layer-dot" style="background:var(--mrt-blue)"></div>
+      <label class="layer-label" for="lay-mrt">สถานี MRT (76 สถานี)</label>
+    </div>
+    <div class="layer-item">
+      <input type="checkbox" class="layer-toggle" id="lay-lines" checked onchange="toggleLayer('lines',this.checked)">
+      <div class="layer-dot" style="background:var(--accent-blue);border-radius:2px"></div>
+      <label class="layer-label" for="lay-lines">เส้นทาง MRT</label>
+    </div>
+    <div class="layer-item">
+      <input type="checkbox" class="layer-toggle" id="lay-lu" onchange="toggleLayer('lu',this.checked)">
+      <div class="layer-dot" style="background:var(--lu-urban)"></div>
+      <label class="layer-label" for="lay-lu">การใช้ประโยชน์ที่ดิน</label>
+    </div>
+    <div class="layer-item">
+      <input type="checkbox" class="layer-toggle" id="lay-heatmap" onchange="toggleLayer('heatmap',this.checked)">
+      <div class="layer-dot" style="background:var(--accent-orange)"></div>
+      <label class="layer-label" for="lay-heatmap">Heatmap ความหนาแน่น</label>
+    </div>
+    <div class="layer-item">
+      <input type="checkbox" class="layer-toggle" id="lay-cluster" onchange="toggleLayer('cluster',this.checked)">
+      <div class="layer-dot" style="background:var(--accent-purple)"></div>
+      <label class="layer-label" for="lay-cluster">Cluster Marker</label>
+    </div>
+  </div>
+
+  <!-- BASE MAP -->
+  <div class="sidebar-section">
+    <div class="section-title">🗺 ฐานแผนที่</div>
+    <div class="filter-chips">
+      <div class="chip active" onclick="setBasemap(this,'dark')">Dark</div>
+      <div class="chip" onclick="setBasemap(this,'street')">Street</div>
+      <div class="chip" onclick="setBasemap(this,'satellite')">Satellite</div>
+      <div class="chip" onclick="setBasemap(this,'topo')">Topo</div>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="sidebar-section">
+    <div class="section-title">📌 สัญลักษณ์</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:5px">สายรถไฟฟ้า BTS</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--bts-sukhumvit)"></div>สายสุขุมวิท (สีเขียวอ่อน)</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--bts-silom)"></div>สายสีลม (สีเขียวเข้ม)</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--bts-gold)"></div>สายสีทอง</div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:5px">สายรถไฟฟ้ามหานคร MRT</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--mrt-blue)"></div>สายสีน้ำเงิน</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--mrt-purple)"></div>สายสีม่วง</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--mrt-yellow)"></div>สายสีเหลือง</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:5px">การใช้ประโยชน์ที่ดิน</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--lu-urban)"></div>เขตเมืองและพาณิชยกรรม</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--lu-agri)"></div>พื้นที่เกษตรกรรม</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--lu-water)"></div>แหล่งน้ำ</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--lu-misc)"></div>พื้นที่อื่น ๆ</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--lu-forest)"></div>ป่าชายเลน</div>
+    </div>
+  </div>
+
+  <!-- TOOLS -->
+  <div class="sidebar-section">
+    <div class="section-title">🛠 เครื่องมือ</div>
+    <button class="popup-close-btn" onclick="zoomToBangkok()" style="margin-bottom:5px">🔍 Zoom to Bangkok</button>
+    <button class="popup-close-btn" onclick="measureDistance()" id="btn-measure">📏 วัดระยะทาง</button>
+    <div id="measure-result" style="font-size:11px;color:var(--accent-green);margin-top:5px;display:none"></div>
+  </div>
+
+</aside>
+
+<!-- MAP CONTAINER -->
+<div id="map"></div>
+
+<!-- INFO PANEL -->
+<div id="info-panel">
+  <div class="info-title">🏙 Bangkok Urban Well-being WebGIS</div>
+  <div id="map-coords" style="color:var(--text-muted)">เลื่อนเมาส์บนแผนที่เพื่อดูพิกัด</div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script>
+// ─── BASEMAP TILES ────────────────────────────────────────────────
+const TILES = {
+  dark:      ['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png','© CartoDB'],
+  street:    ['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap'],
+  satellite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','© Esri'],
+  topo:      ['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png','© OpenTopoMap'],
+};
+
+// ─── MAP INIT ────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [13.75, 100.52],
+  zoom: 12,
+  zoomControl: true,
+  attributionControl: true,
+});
+map.zoomControl.setPosition('bottomright');
+L.control.scale({ imperial:false, position:'bottomright' }).addTo(map);
+
+let baseLayer = L.tileLayer(TILES.dark[0], { attribution:TILES.dark[1], maxZoom:19 }).addTo(map);
+
+// ─── COLORS ──────────────────────────────────────────────────────
+const BTS_COLORS = {1:'#1a6b35', 2:'#5dbd6a', 3:'#d4a800'};
+const MRT_COLORS = {1:'#1e60d5', 2:'#6e3bb5', 3:'#e5c000'};
+const LU_COLORS  = {
+  'U':'#e06060','A':'#7ec850','W':'#4fa8e8',
+  'M':'#aaaaaa','F':'#2d7a3a'
+};
+
+// ─── STATE ───────────────────────────────────────────────────────
+let allBtsFeatures = [], allMrtFeatures = [];
+let activeFilter = 'all';
+let isMeasuring = false, measurePoints = [], measureLine = null;
+
+// ─── LAYER GROUPS ────────────────────────────────────────────────
+const layers = {
+  bts:     L.layerGroup().addTo(map),
+  mrt:     L.layerGroup().addTo(map),
+  lines:   L.layerGroup().addTo(map),
+  lu:      L.layerGroup(),
+  heatmap: L.layerGroup(),
+  cluster: L.layerGroup(),
+};
+
+// ─── BASEMAP SWITCH ──────────────────────────────────────────────
+function setBasemap(el, key) {
+  document.querySelectorAll('.sidebar-section:nth-of-type(5) .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  map.removeLayer(baseLayer);
+  baseLayer = L.tileLayer(TILES[key][0], { attribution:TILES[key][1], maxZoom:19 }).addTo(map);
+  baseLayer.bringToBack();
+}
+
+// ─── MARKER ICON ─────────────────────────────────────────────────
+function makeIcon(color, letter) {
+  return L.divIcon({
+    className:'',
+    html:`<div style="
+      width:26px;height:26px;border-radius:50%;
+      background:${color};
+      border:2.5px solid rgba(255,255,255,0.85);
+      box-shadow:0 2px 8px rgba(0,0,0,.5);
+      display:flex;align-items:center;justify-content:center;
+      font-size:10px;font-weight:700;color:#fff;
+      font-family:'Sarabun',sans-serif;
+    ">${letter}</div>`,
+    iconSize:[26,26], iconAnchor:[13,13], popupAnchor:[0,-14]
+  });
+}
+
+// ─── BTS POPUP ───────────────────────────────────────────────────
+function btsPopup(p, color) {
+  return `<div class="popup-inner">
+    <div class="popup-type">BTS · ${p.idstation}</div>
+    <div class="popup-name">${p.name}</div>
+    <div class="popup-row"><strong>เขต:</strong>${p.dname}</div>
+    <div class="popup-row"><strong>สาย:</strong>${p.btsline.replace('เส้นทางรถไฟฟ้า','').replace('บีทีเอส','BTS').trim()}</div>
+    ${p.location ? `<div class="popup-row"><strong>ที่ตั้ง:</strong>${p.location.substring(0,60)}${p.location.length>60?'…':''}</div>` : ''}
+    ${p.station_co ? `<div class="popup-row" style="color:#f0c040"><strong>เชื่อมต่อ:</strong>${p.station_co}</div>` : ''}
+    <div class="popup-tag" style="background:${color}22;border:1px solid ${color}55;color:${color}">
+      ${p.btsline.includes('สุขุมวิท')?'🟢 Sukhumvit':p.btsline.includes('สีลม')?'🟩 Silom':'🟡 Gold Line'}
+    </div>
+  </div>`;
+}
+
+// ─── MRT POPUP ───────────────────────────────────────────────────
+function mrtPopup(p, color) {
+  return `<div class="popup-inner">
+    <div class="popup-type">MRT · ${p.id_station}</div>
+    <div class="popup-name">${p.name}</div>
+    <div class="popup-row"><strong>เขต:</strong>${p.dname}</div>
+    <div class="popup-row"><strong>สาย:</strong>${p.mrtline.replace('เส้นทางรถไฟฟ้ามหานคร','MRT').trim()}</div>
+    ${p.location ? `<div class="popup-row"><strong>ที่ตั้ง:</strong>${p.location.substring(0,60)}${p.location.length>60?'…':''}</div>` : ''}
+    ${p.station_co ? `<div class="popup-row" style="color:#f0c040"><strong>เชื่อมต่อ:</strong>${p.station_co}</div>` : ''}
+    <div class="popup-tag" style="background:${color}22;border:1px solid ${color}55;color:${color}">
+      ${p.mrtline.includes('น้ำเงิน')?'🔵 Blue Line':p.mrtline.includes('ม่วง')?'🟣 Purple Line':'🟡 Yellow Line'}
+    </div>
+  </div>`;
+}
+
+// ─── RENDER BTS ──────────────────────────────────────────────────
+function renderBts(features) {
+  layers.bts.clearLayers();
+  features.forEach(feat => {
+    const p = feat.properties;
+    const color = BTS_COLORS[p.id_btsline] || '#5dbd6a';
+    const letter = p.id_btsline===3?'G':p.id_btsline===1?'S':'V';
+    const marker = L.marker([p.lat, p.lng], { icon:makeIcon(color,letter) });
+    marker.bindPopup(btsPopup(p,color), {maxWidth:250});
+    marker.on('click', () => {
+      document.getElementById('map-coords').textContent =
+        `BTS: ${p.name} | ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    });
+    layers.bts.addLayer(marker);
+  });
+}
+
+// ─── RENDER MRT ──────────────────────────────────────────────────
+function renderMrt(features) {
+  layers.mrt.clearLayers();
+  features.forEach(feat => {
+    const p = feat.properties;
+    const color = MRT_COLORS[p.id_mrtline] || '#1e60d5';
+    const letter = p.id_mrtline===2?'P':p.id_mrtline===3?'Y':'B';
+    const marker = L.marker([p.lat, p.lng], { icon:makeIcon(color,letter) });
+    marker.bindPopup(mrtPopup(p,color), {maxWidth:250});
+    marker.on('click', () => {
+      document.getElementById('map-coords').textContent =
+        `MRT: ${p.name} | ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    });
+    layers.mrt.addLayer(marker);
+  });
+}
+
+// ─── LOAD DATA ───────────────────────────────────────────────────
+async function loadData() {
+  // BTS
+  const btsRes = await fetch('bts_station.geojson');
+  const btsData = await btsRes.json();
+  allBtsFeatures = btsData.features;
+  renderBts(allBtsFeatures);
+
+  // MRT stations
+  const mrtRes = await fetch('mrt_station.geojson');
+  const mrtData = await mrtRes.json();
+  allMrtFeatures = mrtData.features;
+  renderMrt(allMrtFeatures);
+
+  // MRT lines
+  const lineRes = await fetch('mrt_line.geojson');
+  const lineData = await lineRes.json();
+  renderMrtLines(lineData.features);
+
+  // Build heatmap data (all stations)
+  buildHeatmap([...allBtsFeatures, ...allMrtFeatures]);
+  buildCluster([...allBtsFeatures, ...allMrtFeatures]);
+}
+
+// ─── MRT LINES ───────────────────────────────────────────────────
+function renderMrtLines(features) {
+  layers.lines.clearLayers();
+  const lineColors = {'001':'#1e60d5','002':'#6e3bb5','003':'#e5c000'};
+  features.forEach(feat => {
+    const color = lineColors[feat.properties.id_mrtline] || '#888';
+    const lyr = L.geoJSON(feat, {
+      style:{ color, weight:4, opacity:.8, dashArray:null }
+    });
+    lyr.bindTooltip(feat.properties.name, {sticky:true, className:'', direction:'top'});
+    layers.lines.addLayer(lyr);
+  });
+}
+
+// ─── HEATMAP ─────────────────────────────────────────────────────
+function buildHeatmap(features) {
+  const pts = features.map(f => {
+    const p = f.properties;
+    return [p.lat, p.lng, 1];
+  });
+  const heat = L.heatLayer(pts, {
+    radius:30, blur:22, maxZoom:14,
+    gradient:{0.3:'#0000ff',0.6:'#00ff00',1.0:'#ff0000'}
+  });
+  layers.heatmap.clearLayers();
+  layers.heatmap.addLayer(heat);
+}
+
+// ─── CLUSTER ─────────────────────────────────────────────────────
+function buildCluster(features) {
+  const cg = L.markerClusterGroup({ chunkedLoading:true, maxClusterRadius:60 });
+  features.forEach(f => {
+    const p = f.properties;
+    const isBts = !!p.btsline;
+    const color = isBts ? (BTS_COLORS[p.id_btsline]||'#5dbd6a') : (MRT_COLORS[p.id_mrtline]||'#1e60d5');
+    const m = L.circleMarker([p.lat, p.lng], {
+      radius:6, fillColor:color, color:'#fff', weight:1.5, fillOpacity:.9
+    });
+    m.bindPopup(isBts ? btsPopup(p,color) : mrtPopup(p,color), {maxWidth:250});
+    cg.addLayer(m);
+  });
+  layers.cluster.clearLayers();
+  layers.cluster.addLayer(cg);
+}
+
+// ─── LAND USE ────────────────────────────────────────────────────
+let luLoaded = false;
+async function loadLandUse() {
+  if (luLoaded) return;
+  const info = document.getElementById('info-panel');
+  info.querySelector('.info-title').textContent = '⏳ กำลังโหลดข้อมูล Land Use...';
+  try {
+    const res = await fetch('lu_landuse.geojson');
+    const data = await res.json();
+    luLoaded = true;
+    const lyr = L.geoJSON(data, {
+      style: feat => {
+        const l1 = feat.properties.l1;
+        return {
+          fillColor: LU_COLORS[l1] || '#aaa',
+          weight: 0.3, color: '#333',
+          fillOpacity: 0.55, opacity: 0.4
+        };
+      },
+      onEachFeature: (feat, lyr) => {
+        const p = feat.properties;
+        lyr.bindTooltip(`
+          <strong>${p.th}</strong><br>
+          <span style="color:#aaa">${p.en}</span><br>
+          พื้นที่: ${p.area_rai?.toLocaleString()||'?'} ไร่
+        `, {sticky:true});
+      }
+    });
+    layers.lu.addLayer(lyr);
+    info.querySelector('.info-title').textContent = '🏙 Bangkok Urban Well-being WebGIS';
+  } catch(e) {
+    info.querySelector('.info-title').textContent = '⚠️ โหลด Land Use ไม่สำเร็จ';
+  }
+}
+
+// ─── TOGGLE LAYER ────────────────────────────────────────────────
+function toggleLayer(name, show) {
+  if (name === 'lu' && show && !luLoaded) {
+    loadLandUse().then(() => { if(show) map.addLayer(layers.lu); });
+    return;
+  }
+  if (show) map.addLayer(layers[name]);
+  else map.removeLayer(layers[name]);
+}
+
+// ─── FILTER BY LINE ──────────────────────────────────────────────
+function filterLine(el, line) {
+  document.querySelectorAll('.filter-chips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  activeFilter = line;
+
+  let filteredBts = allBtsFeatures;
+  let filteredMrt = allMrtFeatures;
+
+  if (line === 'bts-sukhumvit') { filteredBts = allBtsFeatures.filter(f=>f.properties.id_btsline===2); filteredMrt=[]; }
+  else if (line === 'bts-silom') { filteredBts = allBtsFeatures.filter(f=>f.properties.id_btsline===1); filteredMrt=[]; }
+  else if (line === 'bts-gold')  { filteredBts = allBtsFeatures.filter(f=>f.properties.id_btsline===3); filteredMrt=[]; }
+  else if (line === 'mrt-blue')  { filteredMrt = allMrtFeatures.filter(f=>f.properties.id_mrtline===1); filteredBts=[]; }
+  else if (line === 'mrt-purple'){ filteredMrt = allMrtFeatures.filter(f=>f.properties.id_mrtline===2); filteredBts=[]; }
+  else if (line === 'mrt-yellow'){ filteredMrt = allMrtFeatures.filter(f=>f.properties.id_mrtline===3); filteredBts=[]; }
+
+  renderBts(filteredBts);
+  renderMrt(filteredMrt);
+
+  document.getElementById('stat-bts').textContent = filteredBts.length;
+  document.getElementById('stat-mrt').textContent = filteredMrt.length;
+
+  // Zoom to filtered extent
+  if (line !== 'all') {
+    const all = [...filteredBts, ...filteredMrt];
+    if (all.length > 0) {
+      const lats = all.map(f=>f.properties.lat);
+      const lngs = all.map(f=>f.properties.lng);
+      const bounds = [[Math.min(...lats)-0.02, Math.min(...lngs)-0.02],
+                      [Math.max(...lats)+0.02, Math.max(...lngs)+0.02]];
+      map.fitBounds(bounds, {padding:[30,30]});
+    }
+  }
+}
+
+// ─── SEARCH ──────────────────────────────────────────────────────
+function onSearch(q) {
+  const el = document.getElementById('search-results');
+  if (!q.trim()) { el.innerHTML=''; return; }
+  const results = [...allBtsFeatures, ...allMrtFeatures]
+    .filter(f => f.properties.name.includes(q) || (f.properties.dname||'').includes(q))
+    .slice(0,8);
+  el.innerHTML = results.map(f => {
+    const p = f.properties;
+    const isBts = !!p.btsline;
+    return `<div class="search-result-item" onclick="flyToStation(${p.lat},${p.lng},'${p.name}')">
+      <div class="sr-name">${p.name}</div>
+      <div class="sr-meta">${isBts?'BTS':'MRT'} · ${p.dname}</div>
+    </div>`;
+  }).join('');
+}
+function flyToStation(lat, lng, name) {
+  map.flyTo([lat,lng], 15, {duration:1.2});
+  document.getElementById('search-results').innerHTML='';
+  document.getElementById('search-box').value = name;
+  document.getElementById('map-coords').textContent = `📍 ${name}`;
+}
+
+// ─── ZOOM TO BANGKOK ─────────────────────────────────────────────
+function zoomToBangkok() {
+  map.flyTo([13.75, 100.52], 12, {duration:1.5});
+}
+
+// ─── MEASURE DISTANCE ────────────────────────────────────────────
+let measureMarkers = [];
+function measureDistance() {
+  const btn = document.getElementById('btn-measure');
+  if (!isMeasuring) {
+    isMeasuring = true;
+    measurePoints = [];
+    measureMarkers.forEach(m=>map.removeLayer(m));
+    measureMarkers=[];
+    if (measureLine) { map.removeLayer(measureLine); measureLine=null; }
+    btn.textContent = '❌ ยกเลิกการวัด (คลิก 2 จุด)';
+    btn.style.color='var(--accent-orange)';
+    document.getElementById('measure-result').style.display='none';
+    map.getContainer().style.cursor='crosshair';
+    map.once('click', e => {
+      measurePoints.push(e.latlng);
+      const m1 = L.circleMarker(e.latlng,{radius:6,fillColor:'#ff7b2e',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+      measureMarkers.push(m1);
+      map.once('click', e2 => {
+        measurePoints.push(e2.latlng);
+        const m2 = L.circleMarker(e2.latlng,{radius:6,fillColor:'#ff7b2e',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+        measureMarkers.push(m2);
+        measureLine = L.polyline(measurePoints,{color:'#ff7b2e',weight:2,dashArray:'5,5'}).addTo(map);
+        const dist = measurePoints[0].distanceTo(measurePoints[1]);
+        const res = document.getElementById('measure-result');
+        res.textContent = `📏 ระยะทาง: ${dist>=1000?(dist/1000).toFixed(2)+' km':dist.toFixed(0)+' m'}`;
+        res.style.display='block';
+        isMeasuring=false;
+        btn.textContent='📏 วัดระยะทาง';
+        btn.style.color='';
+        map.getContainer().style.cursor='';
+      });
+    });
+  } else {
+    isMeasuring=false;
+    btn.textContent='📏 วัดระยะทาง';
+    btn.style.color='';
+    map.getContainer().style.cursor='';
+    map.off('click');
+  }
+}
+
+// ─── MOUSE COORDS ────────────────────────────────────────────────
+map.on('mousemove', e => {
+  if (!isMeasuring)
+    document.getElementById('map-coords').textContent =
+      `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+});
+
+// ─── SIDEBAR TOGGLE ──────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ─── INIT ────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
