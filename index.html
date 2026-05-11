@@ -583,16 +583,40 @@ async function loadData() {
 
 // ─── MRT LINES ───────────────────────────────────────────────────
 function renderMrtLines(features) {
+
   layers.lines.clearLayers();
-  const lineColors = {'001':'#1e60d5','002':'#6e3bb5','003':'#e5c000'};
+
+  const lineColors = {
+    '001':'#1e60d5',
+    '002':'#6e3bb5',
+    '003':'#e5c000'
+  };
+
   features.forEach(feat => {
-    const color = lineColors[feat.properties.id_mrtline] || '#888';
+
+    const id = feat.properties.id_mrtline;
+
+    const color = lineColors[id] || '#888';
+
     const lyr = L.geoJSON(feat, {
-      style:{ color, weight:4, opacity:.8, dashArray:null }
+      style:{
+        color: color,
+        weight: 4,
+        opacity: 0.8
+      }
     });
-    lyr.bindTooltip(feat.properties.name, {sticky:true, className:'', direction:'top'});
+
+    lyr.bindTooltip(
+      feat.properties.name || 'MRT Line',
+      {
+        sticky:true
+      }
+    );
+
     layers.lines.addLayer(lyr);
+
   });
+
 }
 
 // ─── HEATMAP ─────────────────────────────────────────────────────
@@ -627,43 +651,117 @@ function buildCluster(features) {
 }
 
 // ─── LAND USE ────────────────────────────────────────────────────
-let luLoaded = false;
 async function loadLandUse() {
+
   if (luLoaded) return;
+
   const info = document.getElementById('info-panel');
-  info.querySelector('.info-title').textContent = '⏳ กำลังโหลดข้อมูล Land Use...';
+
+  info.querySelector('.info-title').textContent =
+    '⏳ กำลังโหลดข้อมูล Land Use...';
+
   try {
-    const res = await fetch('lu_landuse.geojson');
+
+    const res = await fetch('LU_BKK_2566.geojson');
+
     const data = await res.json();
+    console.log(data);
+    alert("LU Loaded");
+    console.log("LU Loaded");
+    console.log(data.features.length);
     luLoaded = true;
+
     const lyr = L.geoJSON(data, {
+
       style: feat => {
-        const l1 = feat.properties.l1;
+
+        const lu = feat.properties.LUL1_CODE;
+
+        let color = '#aaaaaa';
+
+        // Agriculture
+        if (lu === 'A')
+          color = '#7ec850';
+
+        // Urban / Built-up
+        else if (lu === 'U')
+          color = '#e06060';
+
+        // Water
+        else if (lu === 'W')
+          color = '#4fa8e8';
+
+        // Forest
+        else if (lu === 'F')
+          color = '#2d7a3a';
+
         return {
-          fillColor: LU_COLORS[l1] || '#aaa',
-          weight: 0.3, color: '#333',
-          fillOpacity: 0.55, opacity: 0.4
+          fillColor: color,
+          weight: 0.3,
+          color: '#333',
+          fillOpacity: 0.45,
+          opacity: 0.5
         };
       },
-      onEachFeature: (feat, lyr) => {
+
+      onEachFeature: (feat, layer) => {
+
         const p = feat.properties;
-        lyr.bindTooltip(`
-          <strong>${p.th}</strong><br>
-          <span style="color:#aaa">${p.en}</span><br>
-          พื้นที่: ${p.area_rai?.toLocaleString()||'?'} ไร่
-        `, {sticky:true});
+
+        layer.bindPopup(`
+          <div class="popup-inner">
+
+            <div class="popup-type">
+              LAND USE
+            </div>
+
+            <div class="popup-name">
+              ${p.LU_DES_TH || 'ไม่มีข้อมูล'}
+            </div>
+
+            <div class="popup-row">
+              <strong>English:</strong>
+              ${p.LU_DES_EN || '-'}
+            </div>
+
+            <div class="popup-row">
+              <strong>Code:</strong>
+              ${p.LU_CODE || '-'}
+            </div>
+
+            <div class="popup-row">
+              <strong>Area:</strong>
+              ${p.Area_Rai || 0} ไร่
+            </div>
+
+          </div>
+        `);
+
       }
+
     });
+
     layers.lu.addLayer(lyr);
-    info.querySelector('.info-title').textContent = '🏙 Bangkok Urban Well-being WebGIS';
-  } catch(e) {
-    info.querySelector('.info-title').textContent = '⚠️ โหลด Land Use ไม่สำเร็จ';
+
+    info.querySelector('.info-title').textContent =
+      '🏙 Bangkok Urban Well-being WebGIS';
+
   }
+
+  catch(e) {
+
+    console.error(e);
+
+    info.querySelector('.info-title').textContent =
+      '⚠️ โหลด Land Use ไม่สำเร็จ';
+
+  }
+
 }
 
 // ─── TOGGLE LAYER ────────────────────────────────────────────────
 function toggleLayer(name, show) {
-  if (name === 'lu' && show && !luLoaded) {
+  if (name === 'LU_BKK_2566' && show && !luLoaded) {
     loadLandUse().then(() => { if(show) map.addLayer(layers.lu); });
     return;
   }
